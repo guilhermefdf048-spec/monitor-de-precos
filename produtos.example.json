@@ -1,0 +1,10 @@
+{
+  "produtos": [
+    {
+      "nome": "Livro de exemplo",
+      "url": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html",
+      "seletor": ".product_main .price_color",
+      "preco_alvo": 60.00
+    }
+  ]
+}
