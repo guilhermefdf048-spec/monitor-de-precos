@@ -24,7 +24,8 @@ Python 3.10+ · requests · BeautifulSoup · SQLite · pytest · GitHub Actions
 pip install -r requirements.txt
 
 # 2. Crie sua lista de produtos a partir do exemplo
-cp produtos.example.json produtos.json
+cp produtos.example.json produtos.json      # Linux/Mac
+copy produtos.example.json produtos.json    # Windows
 
 # 3. Verifique os preços uma vez
 python -m monitor verificar
@@ -34,6 +35,9 @@ python -m monitor loop --intervalo 60
 
 # Ver o histórico de um produto
 python -m monitor historico "Livro de exemplo"
+
+# Testar os alertas no Discord
+python -m monitor testar-discord
 ```
 
 ### Configurando os produtos
@@ -55,11 +59,25 @@ Para achar o `seletor`: abra a página no navegador, clique com o botão direito
 
 ### Alertas no Discord (opcional)
 
-Crie um webhook no seu servidor (Configurações do canal → Integrações → Webhooks) e defina a variável de ambiente:
+1. No Discord, abra as configurações de um canal → **Integrações** → **Webhooks** → **Novo webhook** → **Copiar URL do webhook**.
+2. Cole a URL no campo `discord_webhook` do seu `produtos.json`:
+
+```json
+{
+  "discord_webhook": "https://discord.com/api/webhooks/...",
+  "produtos": [ ... ]
+}
+```
+
+3. Teste a conexão:
 
 ```bash
-export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
+python -m monitor testar-discord
 ```
+
+Se preferir não deixar a URL no arquivo, use a variável de ambiente `DISCORD_WEBHOOK_URL`, que tem prioridade sobre o arquivo.
+
+> O `produtos.json` está no `.gitignore`, então a URL do seu webhook não vai para o GitHub. Não compartilhe essa URL: quem tiver ela consegue mandar mensagens no seu canal.
 
 ## Estrutura
 
@@ -78,7 +96,7 @@ tests/            # testes com páginas HTML de exemplo (não precisam de intern
 ## Testes
 
 ```bash
-pytest -v
+python -m pytest -v
 ```
 
 ## Uso responsável

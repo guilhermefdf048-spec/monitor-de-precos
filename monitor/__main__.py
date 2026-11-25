@@ -4,36 +4,40 @@ Uso:
     python -m monitor verificar
     python -m monitor loop --intervalo 60
     python -m monitor historico "Nome do produto"
+    python -m monitor testar-discord
 """
 
 import argparse
 import sys
 import time
 
-from .config import load_products
+from .config import ConfigError, load_config
 from .monitor import alert_message, check_product
-from .notifier import notify
+from .notifier import get_webhook, notify, send_discord
 from .price import format_brl
 from .storage import PriceHistory
 
 
 def run_once(products_file: str, db_file: str) -> int:
-    products = load_products(products_file)
+    config = load_config(products_file)
     history = PriceHistory(db_file)
     errors = 0
     try:
-        for product in products:
+        for product in config.products:
             result = check_product(product, history)
             if result.error:
                 errors += 1
                 print(f"❌ {product.name}: {result.error}")
             elif result.hit_target:
-                notify(alert_message(result))
+                notify(alert_message(result), config.discord_webhook)
             else:
-                print(f"✓ {product.name}: {format_brl(result.price)}")
+                print(
+                    f"✓ {product.name}: {format_brl(result.price)} "
+                    f"(alvo: {format_brl(product.target_price)})"
+                )
     finally:
         history.close()
-    return 1 if errors == len(products) and products else 0
+    return 1 if errors == len(config.products) else 0
 
 
 def show_history(name: str, db_file: str) -> int:
@@ -49,6 +53,20 @@ def show_history(name: str, db_file: str) -> int:
     finally:
         history.close()
     return 0
+
+
+def test_discord(products_file: str) -> int:
+    webhook = get_webhook(load_config(products_file).discord_webhook)
+    if not webhook:
+        print(
+            "Nenhum webhook configurado. Coloque em \"discord_webhook\" no "
+            f"{products_file} ou na variável DISCORD_WEBHOOK_URL."
+        )
+        return 1
+    if send_discord(webhook, "✅ Monitor de preços conectado! Os alertas vão chegar aqui."):
+        print("Mensagem de teste enviada. Confira o canal no Discord.")
+        return 0
+    return 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -67,22 +85,31 @@ def main(argv: list[str] | None = None) -> int:
     hist = sub.add_parser("historico", help="mostra o histórico de um produto")
     hist.add_argument("nome")
 
+    sub.add_parser("testar-discord", help="envia uma mensagem de teste ao Discord")
+
     args = parser.parse_args(argv)
 
-    if args.comando == "verificar":
-        return run_once(args.produtos, args.banco)
+    try:
+        if args.comando == "verificar":
+            return run_once(args.produtos, args.banco)
 
-    if args.comando == "loop":
-        print(f"Verificando a cada {args.intervalo} min. Ctrl+C para parar.")
-        try:
+        if args.comando == "loop":
+            print(f"Verificando a cada {args.intervalo} min. Ctrl+C para parar.")
             while True:
                 run_once(args.produtos, args.banco)
                 time.sleep(args.intervalo * 60)
-        except KeyboardInterrupt:
-            print("\nEncerrado.")
-            return 0
 
-    return show_history(args.nome, args.banco)
+        if args.comando == "testar-discord":
+            return test_discord(args.produtos)
+
+        return show_history(args.nome, args.banco)
+
+    except ConfigError as exc:
+        print(f"❌ {exc}")
+        return 1
+    except KeyboardInterrupt:
+        print("\nEncerrado.")
+        return 0
 
 
 if __name__ == "__main__":
